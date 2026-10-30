@@ -1,0 +1,205 @@
+EGY DEV | BY EGY
+يا حرامي متسرقش السكربت مش بتاعك
+ Hey thief don't steal the script it's not yours
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local rs = game:GetService("RunService")
+local uis = game:GetService("UserInputService")
+local plrs = game:GetService("Players")
+local lp = plrs.LocalPlayer
+local cam = workspace.CurrentCamera
+
+local win = Rayfield:CreateWindow({
+    Name = "EGY DEV | BY EGY",
+    LoadingTitle = "EGY DEV | BY EGY",
+    LoadingSubtitle = "Loading...",
+    ConfigurationSaving = { Enabled = false },
+    KeySystem = false
+})
+
+local aim, esp = false, false
+local targ, fov, col = nil, 130, Color3.fromRGB(0, 255, 0)
+local aimPart = "Head"
+local ignored = {}
+local flickCount, lastFlick = 0, 0
+local lockDelay, aimTime = 0.05, 0
+
+local crc = Drawing.new("Circle")
+crc.Visible, crc.Thickness, crc.Transparency, crc.Filled = false, 1.5, 0.8, false
+
+local function getPart(c)
+    if aimPart == "Head" then return c:FindFirstChild("Head") end
+    if aimPart == "Body" then return c:FindFirstChild("HumanoidRootPart") or c:FindFirstChild("Torso") end
+    if aimPart == "Legs" then return c:FindFirstChild("LeftUpperLeg") or c:FindFirstChild("LeftLeg") end
+    return c:FindFirstChild("Head")
+end
+
+local function isVis(part, myChar)
+    local param = RaycastParams.new()
+    param.FilterDescendantsInstances = {myChar, part.Parent}
+    param.FilterType = Enum.RaycastFilterType.Exclude
+    local ray = workspace:Raycast(cam.CFrame.Position, part.Position - cam.CFrame.Position, param)
+    return ray == nil
+end
+
+local function getTarg()
+    local center = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2)
+    local best, dist = nil, fov
+    local t = tick()
+
+    for _, v in pairs(plrs:GetPlayers()) do
+        if v ~= lp and v.Character and not (ignored[v.Name] and ignored[v.Name] > t) then
+            local c = v.Character
+            local h = c:FindFirstChild("Humanoid")
+            local p = getPart(c)
+            
+            if p and h and h.Health > 0 then
+                local pos, onScreen = cam:WorldToViewportPoint(p.Position)
+                if onScreen then
+                    local d = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    if d <= dist and isVis(p, lp.Character) then
+                        best, dist = p, d
+                    end
+                end
+            end
+        end
+    end
+    return best
+end
+
+uis.InputChanged:Connect(function(input, gp)
+    if gp or not aim or not targ then return end
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        if input.Delta.Magnitude > 25 then
+            local t = tick()
+            if (t - lastFlick < 0.4) then 
+                flickCount = flickCount + 1 
+            else 
+                flickCount = 1 
+            end
+            lastFlick = t
+            
+            if flickCount >= 2 then
+                ignored[targ.Parent.Name] = t + 1
+                targ = nil
+                flickCount = 0
+            end
+        end
+    end
+end)
+
+local tab = win:CreateTab("aimbot", 4483362458)
+
+tab:CreateToggle({
+    Name = "تشغيل الأيم بوت Aimbot",
+    CurrentValue = false,
+    Flag = "AimbotToggle",
+    Callback = function(v) aim = v; if not v then targ = nil end end
+})
+
+tab:CreateDropdown({
+    Name = "مكان التصويب Target Part",
+    Options = {"Head", "Body", "Legs"},
+    CurrentOption = {"Head"},
+    MultipleOptions = false,
+    Flag = "TargetPart",
+    Callback = function(o) aimPart = o[1]; targ = nil end
+})
+
+tab:CreateSlider({
+    Name = "حجم الدائرة FOV Radius",
+    Range = {50, 500},
+    Increment = 10,
+    Suffix = "",
+    CurrentValue = fov,
+    Flag = "FOVSize",
+    Callback = function(v) fov = v end
+})
+
+tab:CreateColorPicker({
+    Name = "لون الدائرة FOV Color",
+    Color = col,
+    Flag = "FOVColor",
+    Callback = function(v) col = v end
+})
+
+task.spawn(function()
+    task.wait(1)
+    for _, v in pairs(game.CoreGui:GetDescendants()) do
+        if v:IsA("TextBox") and (v.Text:match("^#") or v.Text:match("^%d+,%d+,%d+")) then
+            v.Visible = false
+            v.Parent.Visible = false
+        end
+    end
+end)
+
+local function addESP(c)
+    if not c or not esp or c:FindFirstChild("EGY_ESP") then return end
+    local h = Instance.new("Highlight")
+    h.Name, h.Adornee = "EGY_ESP", c
+    h.FillColor, h.FillTransparency = Color3.fromRGB(0, 255, 0), 0.5
+    h.OutlineColor, h.OutlineTransparency = Color3.fromRGB(0, 255, 0), 0
+    h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    h.Parent = c
+end
+
+tab:CreateToggle({
+    Name = "كشف اماكن ESP",
+    CurrentValue = false,
+    Flag = "ESPToggle",
+    Callback = function(v)
+        esp = v
+        for _, p in pairs(plrs:GetPlayers()) do
+            if p ~= lp and p.Character then
+                if v then addESP(p.Character) else
+                    local e = p.Character:FindFirstChild("EGY_ESP")
+                    if e then e:Destroy() end
+                end
+            end
+        end
+    end
+})
+
+rs.RenderStepped:Connect(function()
+    crc.Radius, crc.Color = fov, col
+    
+    if aim and lp.Character then
+        crc.Visible = true
+        crc.Position = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2)
+        
+        if not targ then
+            local nt = getTarg()
+            if nt and (os.clock() - aimTime >= lockDelay) then 
+                targ = nt 
+                aimTime = os.clock()
+            elseif not nt then 
+                aimTime = os.clock() 
+            end
+        end
+
+        if targ then
+            local h = targ.Parent and targ.Parent:FindFirstChild("Humanoid")
+            
+            if not h or h.Health <= 0 or not targ.Parent then
+                targ = nil
+                aimTime = os.clock()
+            else
+                local targetCFrame = CFrame.lookAt(cam.CFrame.Position, targ.Position)
+                cam.CFrame = cam.CFrame:Lerp(targetCFrame, 0.4)
+            end
+        end
+    else
+        crc.Visible = false
+        targ = nil
+    end
+
+    if esp then
+        for _, p in pairs(plrs:GetPlayers()) do
+            if p ~= lp and p.Character then addESP(p.Character) end
+        end
+    end
+end)
+
+lp.CharacterAdded:Connect(function()
+    aim, targ, ignored = false, nil, {}
+end)
